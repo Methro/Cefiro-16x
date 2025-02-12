@@ -38,11 +38,11 @@ jobs:
             exit 1
           fi
 
-        - name: PNG Optimisation Process
+      # Paso corregido (indentación fijada)
+      - name: PNG Optimisation Process
         run: |
           echo -e "\033[35m╰┈➤ Optimisation Progress\033[0m"
           
-          # Size formatting function
           format_size() {
             local size=$1
             local units=('B' 'KB' 'MB' 'GB')
@@ -89,7 +89,6 @@ jobs:
             done
           ' sh {} +
 
-
       - name: Commit and Push Optimised Files
         if: success()
         run: |
@@ -102,7 +101,6 @@ jobs:
           git config user.name "GitHub Actions Bot"
           git config user.email "actions-bot@users.noreply.github.com"
           
-          # Add only optimised files
           while read -r file_path; do
             git add "$file_path"
             echo -e "  \033[32mStaged changes for: \033[33m$file_path\033[0m"

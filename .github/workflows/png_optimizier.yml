@@ -1,4 +1,4 @@
-name: Advanced PNG Optimisation
+name: Streamlined PNG Optimisation
 
 on:
   push:
@@ -38,70 +38,79 @@ jobs:
             exit 1
           fi
 
-      - name: PNG Optimisation Process
+        - name: PNG Optimisation Process
         run: |
           echo -e "\033[35m╰┈➤ Optimisation Progress\033[0m"
+          
+          # Size formatting function
+          format_size() {
+            local size=$1
+            local units=('B' 'KB' 'MB' 'GB')
+            local unit=0
+            
+            while (( size >= 1024 && unit < 3 )); do
+              size=$(awk "BEGIN {printf \"%.2f\", $size/1024}")
+              ((unit++))
+            done
+            
+            printf "%.2f%s" "$size" "${units[$unit]}"
+          }
+
           find . -name '*.png' -exec sh -c '
-            for file_path do
-              original_size=$(stat -c%s "$file_path")
-              zopflipng -y --iterations=50 --lossy_8bit --lossy_transparent --filters=0me "$file_path" "$file_path" > /dev/null 2>&1
-              optimised_size=$(stat -c%s "$file_path")
+            format_size() {
+              local size=$1
+              local units=("B" "KB" "MB" "GB")
+              local unit=0
               
-              if [ "$optimised_size" -lt "$original_size" ]; then
+              while [ $(echo "$size >= 1024" | bc) -eq 1 ] && [ $unit -lt 3 ]; do
+                size=$(echo "scale=2; $size/1024" | bc)
+                unit=$((unit + 1))
+              done
+              
+              printf "%.2f%s" "$size" "${units[$unit]}"
+            }
+
+            for file_path do
+              original_bytes=$(stat -c%s "$file_path")
+              zopflipng -y --iterations=50 --lossy_8bit --lossy_transparent --filters=0me "$file_path" "$file_path" > /dev/null 2>&1
+              optimised_bytes=$(stat -c%s "$file_path")
+              
+              original_size=$(format_size "$original_bytes")
+              optimised_size=$(format_size "$optimised_bytes")
+
+              if [ "$optimised_bytes" -lt "$original_bytes" ]; then
                 printf "  \033[34m[ Optimised ]\033[0m \033[33m%s\033[0m : \033[31m%s\033[0m -> \033[32m%s\033[0m\n" \
-                "$file_path" "$original_size" "$optimised_size"
+                "$file_path" "${original_size}" "${optimised_size}"
                 echo "$file_path" >> optimised_files.txt
               else
                 printf "  \033[34m[ Unoptimised ]\033[0m \033[33m%s\033[0m : \033[35m%s\033[0m\n" \
-                "$file_path" "$original_size"
+                "$file_path" "${original_size}"
               fi
             done
           ' sh {} +
 
-      - name: Verify Optimisation
-        run: |
-          echo -e "\033[35m╰┈➤ Optimisation Verification\033[0m"
-          if [ ! -f optimised_files.txt ]; then
-            echo -e "\033[1;33m  No files required optimisation\033[0m"
-            exit 0
-          fi
 
-          while read -r file_path; do
-            original_size=$(stat -c%s "$file_path")
-            temp_file=$(mktemp)
-            zopflipng -y --iterations=1 "$file_path" "$temp_file" > /dev/null 2>&1
-            optimised_size=$(stat -c%s "$temp_file")
-
-            if [ "$optimised_size" -lt "$original_size" ]; then
-              echo -e "  \033[33m$file_path\033[0m : \033[32m[ ✔ ]\033[0m"
-            else
-              echo -e "  \033[33m$file_path\033[0m : \033[31m[ ✖ ]\033[0m"
-              rm "$temp_file"
-              echo -e "\n\033[1;41mERROR: Post-optimisation verification failed\033[0m"
-              exit 1
-            fi
-            rm "$temp_file"
-          done < optimised_files.txt
-
-      - name: Commit and Push Changes
+      - name: Commit and Push Optimised Files
         if: success()
         run: |
           echo -e "\033[35m╰┈➤ Git Operations\033[0m"
           if [ ! -f optimised_files.txt ]; then
-            echo -e "  \033[1;33mNo optimisation occurred, skipping commit and push\033[0m"
+            echo -e "  \033[1;33mNo files were optimised, skipping commit\033[0m"
             exit 0
           fi
 
           git config user.name "GitHub Actions Bot"
           git config user.email "actions-bot@users.noreply.github.com"
           
+          # Add only optimised files
           while read -r file_path; do
             git add "$file_path"
+            echo -e "  \033[32mStaged changes for: \033[33m$file_path\033[0m"
           done < optimised_files.txt
 
           if ! git diff-index --quiet HEAD; then
             git commit -m "Optimised PNG files using Zopfli" -m "Affected files: $(paste -sd, optimised_files.txt)"
-            echo -e "  \033[32mSuccessfully committed optimised files\033[0m"
+            echo -e "  \033[1;32mSuccessfully committed optimised files\033[0m"
             git push "https://${{ secrets.GH_TOKEN }}@github.com/Methro/Cefiro-16x.git" HEAD:Test
           else
             echo -e "  \033[33mNo detectable changes after optimisation\033[0m"

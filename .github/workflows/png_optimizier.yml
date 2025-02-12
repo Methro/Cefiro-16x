@@ -18,7 +18,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y zopfli file
+          sudo apt-get install -y zopfli file bc
 
       - name: Validate PNG Files
         run: |
@@ -38,36 +38,35 @@ jobs:
             exit 1
           fi
 
-      # Paso corregido (indentación fijada)
       - name: PNG Optimisation Process
         run: |
           echo -e "\033[35m╰┈➤ Optimisation Progress\033[0m"
           
           format_size() {
-            local size=$1
-            local units=('B' 'KB' 'MB' 'GB')
-            local unit=0
+            size=$1
+            units='B KB MB GB'
+            unit=0
             
-            while (( size >= 1024 && unit < 3 )); do
-              size=$(awk "BEGIN {printf \"%.2f\", $size/1024}")
-              ((unit++))
+            while [ "$(echo "$size >= 1024" | bc)" -eq 1 ] && [ $unit -lt 3 ]; do
+              size=$(echo "scale=2; $size / 1024" | bc)
+              unit=$((unit + 1))
             done
             
-            printf "%.2f%s" "$size" "${units[$unit]}"
+            printf "%.2f%s" "$size" "$(echo "$units" | cut -d' ' -f$((unit + 1)))"
           }
 
           find . -name '*.png' -exec sh -c '
             format_size() {
-              local size=$1
-              local units=("B" "KB" "MB" "GB")
-              local unit=0
+              size=$1
+              units="B KB MB GB"
+              unit=0
               
-              while [ $(echo "$size >= 1024" | bc) -eq 1 ] && [ $unit -lt 3 ]; do
-                size=$(echo "scale=2; $size/1024" | bc)
+              while [ "$(echo "$size >= 1024" | bc)" -eq 1 ] && [ $unit -lt 3 ]; do
+                size=$(echo "scale=2; $size / 1024" | bc)
                 unit=$((unit + 1))
               done
               
-              printf "%.2f%s" "$size" "${units[$unit]}"
+              printf "%.2f%s" "$size" "$(echo "$units" | cut -d" " -f$((unit + 1)))"
             }
 
             for file_path do
